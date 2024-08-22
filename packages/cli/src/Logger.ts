@@ -16,6 +16,11 @@ export class Logger {
 
 	constructor() {
 		const level = config.getEnv('logs.level');
+		const format = config.getEnv('logs.format');
+		const output = config
+			.getEnv('logs.output')
+			.split(',')
+			.map((line) => line.trim());
 
 		this.logger = winston.createLogger({
 			level,
@@ -29,47 +34,21 @@ export class Logger {
 			}
 		}
 
-		const output = config
-			.getEnv('logs.output')
-			.split(',')
-			.map((line) => line.trim());
+		const logFormat = format === 'json' ? this.getJsonFormat() : this.getConsoleFormat(level);
 
 		if (output.includes('console')) {
-			let format: winston.Logform.Format;
-			if (['debug', 'verbose'].includes(level)) {
-				format = winston.format.combine(
-					winston.format.metadata(),
-					winston.format.timestamp(),
-					winston.format.colorize({ all: true }),
-
-					winston.format.printf(({ level: logLevel, message, timestamp, metadata }) => {
-						return `${timestamp} | ${logLevel.padEnd(18)} | ${message}${
-							// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-							Object.keys(metadata).length ? ` ${JSON.stringify(inspect(metadata))}` : ''
-						}`;
-					}),
-				);
-			} else {
-				format = winston.format.printf(({ message }: { message: string }) => message);
-			}
-
 			this.logger.add(
 				new winston.transports.Console({
-					format,
+					format: logFormat,
 				}),
 			);
 		}
 
 		if (output.includes('file')) {
-			const fileLogFormat = winston.format.combine(
-				winston.format.timestamp(),
-				winston.format.metadata(),
-				winston.format.json(),
-			);
 			this.logger.add(
 				new winston.transports.File({
 					filename: config.getEnv('logs.file.location'),
-					format: fileLogFormat,
+					format: logFormat,
 					maxsize: config.getEnv('logs.file.fileSizeMax') * 1048576, // config * 1mb
 					maxFiles: config.getEnv('logs.file.fileCountMax'),
 				}),
@@ -77,6 +56,37 @@ export class Logger {
 		}
 
 		LoggerProxy.init(this);
+	}
+
+	private getConsoleFormat(level: string): winston.Logform.Format {
+		let consoleFormat: winston.Logform.Format;
+
+		if (['debug', 'verbose'].includes(level)) {
+			consoleFormat = winston.format.combine(
+				winston.format.metadata(),
+				winston.format.timestamp(),
+				winston.format.colorize({ all: true }),
+
+				winston.format.printf(({ level: logLevel, message, timestamp, metadata }) => {
+					return `${timestamp} | ${logLevel.padEnd(18)} | ${message}${
+						// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+						Object.keys(metadata).length ? ` ${JSON.stringify(inspect(metadata))}` : ''
+					}`;
+				}),
+			);
+		} else {
+			consoleFormat = winston.format.printf(({ message }: { message: string }) => message);
+		}
+
+		return consoleFormat;
+	}
+
+	private getJsonFormat(): winston.Logform.Format {
+		return winston.format.combine(
+			winston.format.timestamp(),
+			winston.format.metadata(),
+			winston.format.json(),
+		);
 	}
 
 	private log(level: (typeof LOG_LEVELS)[number], message: string, meta: object = {}): void {
