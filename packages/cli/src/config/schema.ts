@@ -314,6 +314,12 @@ export const schema = {
 			default: 'console',
 			env: 'N8N_LOG_OUTPUT',
 		},
+		format: {
+			doc: 'How to format logs. Options are: console, json.',
+			format: String,
+			default: 'console',
+			env: 'N8N_LOG_FORMAT',
+		},
 		file: {
 			fileCountMax: {
 				doc: 'Maximum number of files to keep.',
